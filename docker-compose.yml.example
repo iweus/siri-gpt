@@ -4,10 +4,10 @@ services:
   siri-gpt:
     image: siri-gpt
     environment:
-      - API_KEY=$API_KEY
-      - OPENAI_API_KEY=$OPENAI_API_KEY
-      - PROXY_URL=$PROXY_URL
-      - REDIS_HOST=$REDIS_HOST
+      - API_KEY=xxxxxxx
+      - OPENAI_API_KEY=xxxxxxxxx
+      - PROXY_URL=http://x.x.x.x:xxxx
+      - REDIS_HOST=x.x.x.x
       - REDIS_PORT=6379
       - MAX_TOKEN_LIMIT=4000
     ports:
