@@ -1,59 +1,39 @@
 ### Siri-GPT
 
-English / [简体中文](./README_CN.md)
+ 中文 / [English](./README_EN.md)
+#### 介绍
+这是通过apple快捷指令与chatgpt交互的解决方案
 
+快捷指令下载地址：https://www.icloud.com/shortcuts/a7173900a84142f3b7a0a556c21fc465
 
-##### Introduction
+项目需要用到 OpenAI API key
 
-Siri-GPT is a solution for interacting with ChatGPT using Apple Shortcuts.
+项目基于[langchain](https://github.com/langchain-ai/langchain)，支持记录上下文，每次对话开始时算一轮对话，如果一轮对话的超出token限制会根据设置的token长度进行截取
 
-Shortcut Download Link: https://www.icloud.com/shortcuts/a7173900a84142f3b7a0a556c21fc465
+#### 使用方法
+1. 部署项目（项目需要用到redis，需先部署redis，或者使用docker compose部署）
+2. 下载安装[苹果快捷指令](https://www.icloud.com/shortcuts/a7173900a84142f3b7a0a556c21fc465)并配置相关参数：  
+     - host: 服务端地址，http://ip_address:port  
+     - token: 访问令牌，部署项目时填写的API_KEY
+3. 在苹果设备上手动运行一次“对话”快捷指令，同意所有权限。
+4. “Hey Siri，对话”，开始与ChatGPT对话。
 
-The project requires an OpenAI API key.
-
-The project is based on [langchain](https://github.com/langchain-ai/langchain) and supports context retention. Each conversation is treated as a separate round, and if a round exceeds the token limit, it is truncated based on the specified token length.
-
-
-##### Usage
-
-1. Deploy the project (requires Redis, so deploy Redis first).
-2. Download and install the [Apple Shortcuts](https://www.icloud.com/shortcuts/a7173900a84142f3b7a0a556c21fc465) and configure the following parameters:  
-    - host: Server address (e.g., http://ip_address:port)  
-    - token: Access token (API_KEY used during project deployment)
-3. Manually run the "对话" shortcut on your Apple device and grant all permissions.
-
-
-##### Dependencies
+#### 依赖
 
 - Redis
+
 - Python
 
-##### Running the Project
-1. Set up the environment variables or add them directly to the .env file in the project's root directory (refer to .env.example for reference).
-2. Install the required dependencies: pip install -r requirements.txt.
-3. Run the project using Gunicorn: gunicorn -c gunicorn_config.py app:app.
+#### 本地运行
 
-##### Environment Variables
+1. 配置环境变量或者直接写在项目根目录的.env文件，参考.env.example
 
-- OPENAI_API_KEY (required): OpenAI API key obtained from your OpenAI account page.
+2. pip install -r requirements.txt
 
-- API_KEY (required): Access token(s), optional but can include multiple tokens separated by commas. Corresponds to the token in the shortcut.
+3. gunicorn -c gunicorn_config.py app:app
 
-- MODEL (optional): OpenAI language model, default is gpt-3.5-turbo.
-
-- MAX_TOKEN_LIMIT (optional): OpenAI token limit, default is 2000.
-
-- PROXY_URL (optional): OpenAI HTTP proxy address.
-
-- REDIS_HOST (required): Redis address.
-
-- REDIS_PORT (required): Redis port.
-
-
-##### Docker build & Run
+##### Docker部署
 ```
-docker build -t siri-gpt .
-
 # Run in the background
 docker run -d -p 5000:5000 \
    -e OPENAI_API_KEY="sk-xxxxxxx" \
@@ -64,10 +44,7 @@ docker run -d -p 5000:5000 \
    iweus/siri-gpt
 
 # Access the application at
-http://localhost:5000/
 ```
-
-
 
 ##### Docker compose
 
@@ -95,3 +72,6 @@ services:
     ports:
       - 6379:6379
 ```
+
+
+
