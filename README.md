@@ -43,7 +43,6 @@ docker run -d -p 5000:5000 \
    -e REDIS_PORT=6379  \
    iweus/siri-gpt
 
-# Access the application at
 ```
 
 ##### Docker compose
