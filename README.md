@@ -17,9 +17,9 @@ The project is based on [langchain](https://github.com/langchain-ai/langchain) a
 ##### Usage
 
 1. Deploy the project (requires Redis, so deploy Redis first).
-2. Download and install the [Apple Shortcuts](https://www.icloud.com/shortcuts/a7173900a84142f3b7a0a556c21fc465) and configure the following parameters:
-    host: Server address (e.g., http://ip_address:port)
-    token: Access token (API_KEY used during project deployment)
+2. Download and install the [Apple Shortcuts](https://www.icloud.com/shortcuts/a7173900a84142f3b7a0a556c21fc465) and configure the following parameters:  
+    - host: Server address (e.g., http://ip_address:port)  
+    - token: Access token (API_KEY used during project deployment)
 3. Manually run the "对话" shortcut on your Apple device and grant all permissions.
 
 
