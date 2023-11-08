@@ -53,7 +53,7 @@ MAX_TOKEN_LIMIT = int(os.environ.get('MAX_TOKEN_LIMIT', 2000))
 
 REDIS_HOST = os.environ.get('REDIS_HOST', 'redis')
 REDIS_PORT = int(os.environ.get('REDIS_PORT', 6379))
-REDIS_PASSWORD = os.environ.get('REDIS_AUTH', None)
+REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', None)
 REDIS_DB = int(os.environ.get('REDIS_DB', 0))
 SYSTEM_TEMPLATE = os.environ.get('SYSTEM_TEMPLATE', "You are a nice chatbot having a conversation with a person.") 
 
@@ -200,7 +200,7 @@ def ask_question(session_id,question_id,question):
     redis_key = get_redis_key(session_id,question_id)
     callbackhandler = StreamingGradioCallbackHandler(redis_key)
     llm = ChatOpenAI(streaming=True,callbacks=[callbackhandler])
-    redis_url = f'redis://{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
+    redis_url = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
     message_history = RedisChatMessageHistory(url=redis_url, ttl=600, session_id=session_id)
     memory = CustomTokenMemory(llm=llm,max_token_limit=MAX_TOKEN_LIMIT,memory_key="chat_history", return_messages=True,chat_memory=message_history)
     prompt = ChatPromptTemplate(
@@ -268,4 +268,4 @@ def answer():
     return resp
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0",debug=True, port=5000)
+    app.run(host="0.0.0.0",debug=True, port=5001)
