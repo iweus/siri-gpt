@@ -163,3 +163,5 @@ docker-compose.yaml
 
 myenv/
 
+chat_history*
+app.log*

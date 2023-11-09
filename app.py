@@ -1,3 +1,4 @@
+import json
 from flask import Flask, request, jsonify
 import openai
 from langchain.prompts import (
@@ -12,6 +13,7 @@ from langchain.memory.chat_memory import BaseChatMemory
 from langchain.schema.language_model import BaseLanguageModel
 from langchain.schema.messages import BaseMessage, get_buffer_string
 from langchain.memory.chat_message_histories import RedisChatMessageHistory
+from langchain.memory.chat_message_histories import FileChatMessageHistory
 from flask import Flask, request
 from dotenv import load_dotenv
 from langchain.callbacks.base import BaseCallbackHandler
@@ -52,21 +54,54 @@ openai.api_base = os.getenv("OPEN_AI_BASE")
 MODEL = os.environ.get("MODEL","gpt-3.5-turbo")
 MAX_TOKEN_LIMIT = int(os.environ.get('MAX_TOKEN_LIMIT', 2000))
 
+USE_REDIS_CACHE = os.environ.get('REDIS_HOST', None) is not None
 REDIS_HOST = os.environ.get('REDIS_HOST', 'redis')
 REDIS_PORT = int(os.environ.get('REDIS_PORT', 6379))
 REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', None)
 REDIS_DB = int(os.environ.get('REDIS_DB', 0))
-redis_url = f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
+REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
 if REDIS_PASSWORD is not None:
-    redis_url = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
+    REDIS_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
 
+CACHE_PATH = os.environ.get('CACHE_PATH', "./chat_history")
 SYSTEM_TEMPLATE = os.environ.get('SYSTEM_TEMPLATE', "You are a nice chatbot having a conversation with a person.") 
+
+os.path.exists(CACHE_PATH) or os.makedirs(CACHE_PATH)
 
 redis_client = redis.Redis(
     host=REDIS_HOST, 
     port=REDIS_PORT,
     password=REDIS_PASSWORD, 
     db=REDIS_DB)
+
+def read_aws_text(session_id, question_id):
+    cache_key = get_cache_key(session_id,question_id)
+    if USE_REDIS_CACHE:
+        msg = redis_client.get(cache_key)
+        if msg:
+            return msg.decode("utf-8")
+        return None
+    else:
+        if not os.path.exists(f"{cache_key}.txt"):
+            return ""
+        with open(f"{cache_key}.txt", "r") as f:
+            return f.read()
+
+
+def append_to_aws_text(cache_key, message):
+    logger.info(f"{cache_key} append_to_aws_text: {message}")
+    if USE_REDIS_CACHE:
+        append_text_to_redis(cache_key, message)
+    else:
+        with open(f"{cache_key}.txt", "a") as f:
+            f.write(message)
+
+def remove_aws_text(cache_key):
+    if USE_REDIS_CACHE:
+        redis_client.delete(cache_key)
+    else:
+        if os.path.exists(f"{cache_key}.txt"):
+            os.remove(f"{cache_key}.txt")
 
 def cut_sent(para):
     para = re.sub('([。！？\?])([^”’])', r"\1\n\2", para)
@@ -119,6 +154,7 @@ def split_text(text):
     return "", None
 
 def append_text_to_redis(redis_key, text):
+
     content = redis_client.get(redis_key)
     if content is not None:
         content = content.decode("utf-8") + text
@@ -126,8 +162,8 @@ def append_text_to_redis(redis_key, text):
         content = text
     redis_client.set(redis_key, content)
 
-def get_redis_key(session_id,question_id):
-    return f"{session_id}_{question_id}"
+def get_cache_key(session_id,question_id):
+    return f"{CACHE_PATH}/{session_id}_{question_id}"
 
 class CustomTokenMemory(BaseChatMemory):
     new_buffer: List = []
@@ -167,7 +203,7 @@ class CustomTokenMemory(BaseChatMemory):
 
     def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, str]) -> None:
         """Save context from this conversation to buffer. Pruned."""
-        super(). save_context(inputs, outputs)
+        super().save_context(inputs, outputs)
         self. prune_memory()
         
     def prune_memory(self):
@@ -191,22 +227,30 @@ class StreamingGradioCallbackHandler(BaseCallbackHandler):
         pass
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
-        append_text_to_redis(self.redis_key,token)
+        append_to_aws_text(self.redis_key,token)
 
     def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
-        append_text_to_redis(self.redis_key,END_MARK)
+        append_to_aws_text(self.redis_key,END_MARK)
 
     def on_llm_error(
         self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
     ) -> None:
-        append_text_to_redis(self.redis_key,END_MARK)
+        append_to_aws_text(self.redis_key,END_MARK)
     
 def ask_question(session_id,question_id,question):
-    redis_key = get_redis_key(session_id,question_id)
+    redis_key = get_cache_key(session_id,question_id)
     callbackhandler = StreamingGradioCallbackHandler(redis_key)
     llm = ChatOpenAI(streaming=True,callbacks=[callbackhandler])
-    message_history = RedisChatMessageHistory(url=redis_url, ttl=600, session_id=session_id)
-    memory = CustomTokenMemory(llm=llm,max_token_limit=MAX_TOKEN_LIMIT,memory_key="chat_history", return_messages=True,chat_memory=message_history)
+    if USE_REDIS_CACHE:
+        message_history = RedisChatMessageHistory(url=REDIS_URL, ttl=600, session_id=session_id)
+    else:
+        message_history = FileChatMessageHistory(file_path=f"chat_history/{session_id}.json")
+    memory = CustomTokenMemory(
+        llm=llm,
+        max_token_limit=MAX_TOKEN_LIMIT,
+        memory_key="chat_history", 
+        return_messages=True,
+        chat_memory=message_history)
     prompt = ChatPromptTemplate(
         messages=[
             SystemMessagePromptTemplate.from_template(
@@ -238,8 +282,6 @@ def ask():
     if session_id is None or len(session_id) == 0:
         session_id = secrets.token_hex(16)
     logger.info(f"{session_id} question: {question}")
-    redis_key = get_redis_key(session_id,question_id)
-    redis_client.set(redis_key,"")
     thread = threading.Thread(target=ask_question, args=(session_id,question_id,question,))
     thread.start()
     return jsonify({'status': 'ok','session_id': session_id,'question_id': question_id})
@@ -254,22 +296,18 @@ def answer():
     question_id = data.get('question_id')
     if session_id is None or question_id is None:
         return jsonify({'status': 'fail'})
-    redis_key = get_redis_key(session_id,question_id)
-    msg = redis_client.get(redis_key)
+    msg = read_aws_text(session_id, question_id)
     if msg is not None:
-        msg = msg.decode("utf-8")
         if msg.endswith(END_MARK):
-            redis_client.delete(redis_key)
             msg = msg.rstrip(END_MARK)
             resp = jsonify({'status': 'end', 'msg': msg})
+            remove_aws_text(get_cache_key(session_id,question_id))
         else:
-            value1,value2 = split_text(msg)
+            value1, _ = split_text(msg)
             resp = jsonify({'status': 'running', 'msg': value1})
-            if value2 is not None:
-                redis_client.set(redis_key,value2)
     else:
         resp = jsonify({'status': 'end'})
     return resp
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0",debug=True)
+    app.run(host="0.0.0.0",debug=True, port=5009)
