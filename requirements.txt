@@ -28,16 +28,13 @@ openapi-schema-pydantic==1.2.4
 packaging==23.1
 pydantic==1.10.12
 python-dotenv==1.0.0
-PyYAML==6.0.1
 redis==4.6.0
 regex==2023.8.8
 requests==2.31.0
-SQLAlchemy==2.0.19
 tenacity==8.2.2
 tiktoken==0.4.0
 tqdm==4.65.0
 typing-inspect==0.9.0
 typing_extensions==4.7.1
-urllib3==2.0.4
 Werkzeug==2.3.6
 yarl==1.9.2
