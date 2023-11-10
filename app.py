@@ -310,4 +310,6 @@ def answer():
     return resp
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0",debug=True, port=5009)
+    SERVER_PORT = int(os.environ.get("SERVER_PORT", "5000"))
+    logger.info(f"SERVER_PORT:{SERVER_PORT}")
+    app.run(host="0.0.0.0", debug=True, port=SERVER_PORT)
